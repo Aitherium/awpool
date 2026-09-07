@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "name": "awpool",
+  "description": "Model placement and warm-keeping across your own devices — pick which reachable peer should serve a model right now, and ask it to warm or park.",
+  "url": "https://aitherium.github.io/awpool/",
+  "repository": "https://github.com/Aitherium/awpool",
+  "kind": "runtime",
+  "status": "planned",
+  "adopt": "Have a model stay warm and servable across your own devices — pick which of your reachable peers should serve it.",
+  "pairs_with": [
+    "awnet"
+  ],
+  "includes": []
+}

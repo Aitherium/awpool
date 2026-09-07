@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "awpool"
+version = "0.1.0"
+description = "Model placement and warm-keeping for a personal mesh pool — which of YOUR devices should serve a model right now, and asking it to warm or park. A small client layered over awnet's peer registry; stdlib only."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+# No external dependencies by design. Placement decisions are pure functions;
+# the only I/O is urllib against a peer's own HTTP API, and peer discovery is
+# a LAZY import of awnet (absent awnet is reported honestly, never a silent
+# feature-off). A dependency-less client is one a phone can install.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+awpool = "awpool.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Aitherium/awpool"
+Documentation = "https://github.com/Aitherium/awpool#readme"
+Repository = "https://github.com/Aitherium/awpool.git"
+Issues = "https://github.com/Aitherium/awpool/issues"
+
+[tool.setuptools]
+packages = ["awpool"]
+license-files = ["LICENSE"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501", "E402", "E741"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
