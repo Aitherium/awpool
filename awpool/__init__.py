@@ -11,6 +11,12 @@ awnet, and an absent awnet is reported honestly rather than reading as a
 feature that is switched off.
 """
 
+# Kept equal to pyproject's `version` (check_package_version_agreement).
+# publish-awpool's post-publish smoke installs the wheel and reads this;
+# without it the lane died on AttributeError AFTER the artifact was already
+# on PyPI, so the package shipped and the lane reported failure.
+__version__ = "0.1.0"
+
 from .models import (
     ModelState,
     PeerInfo,
@@ -21,6 +27,7 @@ from .models import (
 from .placement import Placement, model_state_on, pick_peer
 
 __all__ = [
+    "__version__",
     "ModelState",
     "PeerInfo",
     "Placement",
