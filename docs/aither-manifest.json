@@ -5,12 +5,22 @@
   "url": "https://aitherium.github.io/awpool/",
   "repository": "https://github.com/Aitherium/awpool",
   "kind": "runtime",
-  "status": "no-pages",
+  "status": "public",
   "adopt": "Dispatch one public-safe job to a public mirror's free runner and watch it execute.",
   "pairs_with": [
     "awrun",
     "awnet",
     "awdk"
   ],
-  "includes": []
+  "includes": [],
+  "metrics": {
+    "files": {
+      "value": 17,
+      "as_of": "2026-11-08T11:23:21-08:00"
+    },
+    "tests": {
+      "value": 4,
+      "as_of": "2026-11-08T11:23:21-08:00"
+    }
+  }
 }
