@@ -2,7 +2,7 @@
 
 <!-- aither-header:start GENERATED from the ecosystem registry. Edits here are overwritten; change the registry instead. -->
 
-**[Docs](https://aitherium.github.io/awpool/)**  ·  [Source](https://github.com/Aitherium/awpool)  ·  [The Aither World](https://aitherium.github.io/)
+**[Docs](https://aitherium.github.io/awpool/)**  ·  [Source](https://github.com/Aitherium/awpool)  ·  `pip install awpool`  ·  [The Aither World](https://aitherium.github.io/)
 
 > **The Aither World** is an operating system for agents — a Linux you can hand to one, the runtimes it works in, and the tools it works with. [awnix](https://github.com/Aitherium/awnix) is the Linux underneath it; **awpool** is one of its 71 bricks — each installs on its own, runs offline, and needs no account. 5 more are in development and 15 are planned.
 >
