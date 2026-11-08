@@ -23,6 +23,8 @@ Dispatch one public-safe job to a public mirror's free runner and watch it execu
 ## Where it lives
 
 - Repo: https://github.com/Aitherium/awpool
+- Docs: https://aitherium.github.io/awpool/
+- Manifest (keys + the one-line adoption story): https://aitherium.github.io/awpool/aither-manifest.json
 
 This repository is mirrored from the AitherOS monorepo by `.github/workflows/sync-awpool.yml`; hand edits made here are overwritten on the next sync — change the source instead.
 
