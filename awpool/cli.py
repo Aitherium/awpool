@@ -23,6 +23,14 @@ from typing import Optional
 from .models import PeerInfo, is_model_catalog, parse_peer_capacity, parse_peer_models
 from .peer_http import build_park_request, build_warm_request, fetch_peer_models, send_request
 from .placement import pick_peer
+from .posture import (
+    DEFAULT_ROUTER_ENV_PATH,
+    DEFAULT_STATE_PATH,
+    apply_posture,
+    load_postures,
+    plan_posture,
+    read_active_posture,
+)
 
 DEFAULT_REGISTRY = str(Path.home() / ".config" / "aither" / "peers.json")
 
@@ -262,6 +270,142 @@ def _cmd_request(args, action: str) -> int:
     return 1
 
 
+def _cmd_posture(args) -> int:
+    try:
+        postures = load_postures(getattr(args, "postures", None))
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: could not load postures: {exc}", file=sys.stderr)
+        return 2
+
+    state_path = Path(args.state_file) if getattr(args, "state_file", None) else DEFAULT_STATE_PATH
+    env_path = Path(args.router_env) if getattr(args, "router_env", None) else DEFAULT_ROUTER_ENV_PATH
+
+    if args.posture_cmd == "list":
+        active = read_active_posture(state_path)
+        active_name = active.get("posture") if active else None
+        rows = []
+        for name in sorted(postures):
+            p = postures[name]
+            rows.append(
+                {
+                    "name": p.name,
+                    "active": p.name == active_name,
+                    "primary_lane": p.primary_lane,
+                    "target_ram_gb": p.target_ram_gb,
+                    "description": p.description,
+                }
+            )
+        if args.json:
+            print(json.dumps(rows, indent=2))
+        else:
+            for r in rows:
+                mark = "*" if r["active"] else " "
+                print(
+                    f"{mark} {r['name']:14} lane={r['primary_lane']:18} "
+                    f"~{r['target_ram_gb']:>3} GiB  {r['description']}"
+                )
+        return 0
+
+    if args.posture_cmd == "current":
+        active = read_active_posture(state_path)
+        if args.json:
+            print(json.dumps(active or {"posture": None}, indent=2))
+        elif active:
+            print(
+                f"{active['posture']} (primary={active.get('primary_lane')}, "
+                f"applied={active.get('applied_at')})"
+            )
+        else:
+            print("no active posture recorded")
+        return 0
+
+    if args.posture_cmd == "show":
+        p = postures.get(args.name)
+        if p is None:
+            print(f"ERROR: unknown posture {args.name!r} (known: {', '.join(sorted(postures))})", file=sys.stderr)
+            return 1
+        if args.json:
+            print(json.dumps(p.to_dict(), indent=2))
+        else:
+            print(f"{p.name}: {p.description}")
+            print(f"  primary_lane : {p.primary_lane}")
+            print(f"  target_ram_gb: {p.target_ram_gb}")
+            if p.local_model:
+                print(f"  local_model  : {p.local_model}")
+            for pname, rule in p.peers.items():
+                warm = ", ".join(rule.warm) or "(none)"
+                park = ", ".join(rule.park) or ("all others" if rule.park_others else "(none)")
+                print(f"  peer {pname:<12} warm=[{warm}]  park=[{park}]")
+            if p.router_standins:
+                pairs = ", ".join(f"{k}={v}" for k, v in sorted(p.router_standins.items()))
+                print(f"  router       : {pairs}")
+        return 0
+
+    # plan / apply
+    p = postures.get(args.name)
+    if p is None:
+        print(f"ERROR: unknown posture {args.name!r} (known: {', '.join(sorted(postures))})", file=sys.stderr)
+        return 1
+
+    infos: list[PeerInfo] = []
+    endpoints: dict[str, str] = {}
+    notes_extra: list[str] = []
+
+    if not getattr(args, "local_only", False):
+        mods = _awnet()
+        if mods is not None:
+            registry_cls, check_peer = mods
+            try:
+                registry = registry_cls(args.registry)
+                infos, notes_extra = _gather(registry, check_peer, args.timeout)
+                for peer in registry.list_peers():
+                    if peer.endpoints:
+                        endpoints[peer.name] = peer.endpoints[0]
+            except Exception as exc:  # noqa: BLE001
+                notes_extra.append(f"registry {args.registry} unavailable: {exc}")
+        else:
+            notes_extra.append("awnet not installed — recording posture and router env locally only")
+
+    plan = plan_posture(p, infos)
+    if args.posture_cmd == "plan":
+        payload = plan.to_dict()
+        payload["notes"].extend(notes_extra)
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print(f"plan {p.name} ({len(plan.actions)} action(s)):")
+            for a in plan.actions:
+                print(f"  {a.action:4} {a.model:22} on {a.peer:14} ({a.reason})")
+            for s in plan.skipped:
+                print(f"  skip {s}")
+            for n in payload["notes"]:
+                print(f"  note: {n}")
+        return 0
+
+    outcome = apply_posture(
+        plan,
+        endpoints,
+        dry_run=bool(args.dry_run),
+        timeout=args.timeout,
+        state_path=state_path,
+        router_env_path=env_path,
+    )
+    outcome["notes"].extend(notes_extra)
+    if args.json:
+        print(json.dumps(outcome, indent=2))
+    else:
+        tag = "dry-run" if args.dry_run else ("applied" if outcome["ok"] else "partial")
+        print(f"posture {p.name}: {tag} ({len(outcome['actions'])} action(s))")
+        for r in outcome["actions"]:
+            st = "dry-run" if r.get("dry_run") else ("ok" if r["ok"] else f"failed ({r.get('error')})")
+            print(f"  {r['action']:4} {r['model']:22} on {r['peer']:14} -> {st}")
+        if outcome["router_env"].get("AITHER_MODEL_STANDINS"):
+            print(f"  router: AITHER_MODEL_STANDINS={outcome['router_env']['AITHER_MODEL_STANDINS']}")
+        for n in outcome["notes"]:
+            print(f"  note: {n}")
+    return 0 if outcome["ok"] else 1
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     # GENERATED doctor intercept (gen_aw_doctor.py) -- do not edit
     _dv = locals().get("argv")
@@ -328,6 +472,41 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="peer name; defaults to the placement decision",
     )
 
+    posture_cmd = sub.add_parser(
+        "posture",
+        help="list, plan, or switch named fleet model postures (fleet-multi, heavy-moe, creator, quiet)",
+    )
+    posture_sub = posture_cmd.add_subparsers(dest="posture_cmd", required=True)
+
+    def add_posture_common(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--postures", default=None, help="custom postures JSON file")
+        p.add_argument("--state-file", default=None, help="active posture state JSON path")
+        p.add_argument("--router-env", default=None, help="router env file path")
+        p.add_argument("--json", action="store_true")
+
+    p_list = posture_sub.add_parser("list", help="list available model postures")
+    add_posture_common(p_list)
+
+    p_cur = posture_sub.add_parser("current", help="show the currently active posture")
+    add_posture_common(p_cur)
+
+    p_show = posture_sub.add_parser("show", help="show one posture definition")
+    p_show.add_argument("name")
+    add_posture_common(p_show)
+
+    p_plan = posture_sub.add_parser("plan", help="preview park/warm actions for a posture")
+    p_plan.add_argument("name")
+    add_common(p_plan)
+    add_posture_common(p_plan)
+    p_plan.add_argument("--local-only", action="store_true", help="skip peer registry discovery")
+
+    p_apply = posture_sub.add_parser("apply", help="switch fleet and router env to a posture")
+    p_apply.add_argument("name")
+    add_common(p_apply)
+    add_posture_common(p_apply)
+    p_apply.add_argument("--dry-run", action="store_true", help="plan without sending HTTP calls or saving state")
+    p_apply.add_argument("--local-only", action="store_true", help="record posture and router env without peer HTTP")
+
     args = ap.parse_args(argv)
 
     if args.cmd == "peers":
@@ -340,6 +519,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return _cmd_request(args, "warm")
     if args.cmd == "park":
         return _cmd_request(args, "park")
+    if args.cmd == "posture":
+        return _cmd_posture(args)
     return 2
 
 

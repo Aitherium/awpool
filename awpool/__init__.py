@@ -25,15 +25,35 @@ from .models import (
     parse_peer_models,
 )
 from .placement import Placement, model_state_on, pick_peer
+from .posture import (
+    BUILTIN_POSTURES,
+    PeerPosture,
+    Posture,
+    PostureAction,
+    PosturePlan,
+    apply_posture,
+    load_postures,
+    plan_posture,
+    read_active_posture,
+)
 
 __all__ = [
     "__version__",
+    "BUILTIN_POSTURES",
     "ModelState",
     "PeerInfo",
+    "PeerPosture",
     "Placement",
+    "Posture",
+    "PostureAction",
+    "PosturePlan",
+    "apply_posture",
     "is_model_catalog",
+    "load_postures",
     "model_state_on",
     "parse_peer_capacity",
     "parse_peer_models",
     "pick_peer",
+    "plan_posture",
+    "read_active_posture",
 ]
